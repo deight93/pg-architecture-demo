@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16
+    container_name: pg-cluster-demo
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: testdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  fastapi:
+    build: .
+    container_name: fastapi-cluster-demo
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: testdb
+    command: bash -c "uv run fastapi dev ./app/main.py --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    restart: unless-stopped
