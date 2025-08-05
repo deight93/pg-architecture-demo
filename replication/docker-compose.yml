@@ -1,0 +1,58 @@
+services:
+  master:
+    image: bitnami/postgresql:16
+    container_name: pg-replication-master
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=master
+      - POSTGRESQL_REPLICATION_USER=repl_user
+      - POSTGRESQL_REPLICATION_PASSWORD=repl_pass
+      - POSTGRESQL_USERNAME=pguser
+      - POSTGRESQL_PASSWORD=pgpass
+      - POSTGRESQL_DATABASE=pgdemo
+    ports:
+      - "55432:5432"
+    volumes:
+      - ./master/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "pguser"]
+      interval: 5s
+      retries: 5
+
+  replica:
+    image: bitnami/postgresql:16
+    container_name: pg-replication-replica
+    depends_on:
+      - master
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=slave
+      - POSTGRESQL_REPLICATION_USER=repl_user
+      - POSTGRESQL_REPLICATION_PASSWORD=repl_pass
+      - POSTGRESQL_MASTER_HOST=master
+      - POSTGRESQL_USERNAME=pguser
+      - POSTGRESQL_PASSWORD=pgpass
+      - POSTGRESQL_DATABASE=pgdemo
+    ports:
+      - "55433:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "pguser"]
+      interval: 5s
+      retries: 5
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi-replication-demo
+    command: bash -c "uv run fastapi dev ./app/main.py --host 0.0.0.0 --port 8000"
+    environment:
+      DB_HOST_MASTER: master
+      DB_HOST_REPLICA: replica
+      DB_PORT: 5432
+      DB_USER: pguser
+      DB_PASS: pgpass
+      DB_NAME: pgdemo
+    ports:
+      - "8000:8000"
+    depends_on:
+      - master
+      - replica
