@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  shard1:
+    image: postgres:16
+    container_name: pg-shard1
+    environment:
+      POSTGRES_USER: pguser
+      POSTGRES_PASSWORD: pgpass
+      POSTGRES_DB: pgdemo
+    ports:
+      - "55431:5432"
+    volumes:
+      - ./shard1/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  shard2:
+    image: postgres:16
+    container_name: pg-shard2
+    environment:
+      POSTGRES_USER: pguser
+      POSTGRES_PASSWORD: pgpass
+      POSTGRES_DB: pgdemo
+    ports:
+      - "55432:5432"
+    volumes:
+      - ./shard2/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi-sharding-demo
+    command: bash -c "uv run fastapi dev ./app/main.py --host 0.0.0.0 --port 8000"
+    environment:
+      DB_HOST_SHARD1: shard1
+      DB_HOST_SHARD2: shard2
+      DB_PORT: 5432
+      DB_USER: pguser
+      DB_PASS: pgpass
+      DB_NAME: pgdemo
+    ports:
+      - "8000:8000"
+    depends_on:
+      - shard1
+      - shard2
+    restart: unless-stopped
